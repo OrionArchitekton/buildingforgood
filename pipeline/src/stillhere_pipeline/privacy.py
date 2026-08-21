@@ -399,10 +399,6 @@ def is_suppressed(node: dict[str, Any]) -> bool:
     return False
 
 
-def _is_published_large_int(value: Any, min_cell: int) -> bool:
-    return isinstance(value, int) and not isinstance(value, bool) and value >= min_cell
-
-
 def _scan_counts(node: dict[str, Any], where: str, min_cell: int) -> Iterator[Finding]:
     """Flag published cell values small enough to identify a person (R-06)."""
     for key, value in node.items():
@@ -411,11 +407,17 @@ def _scan_counts(node: dict[str, Any], where: str, min_cell: int) -> Iterator[Fi
             continue
         if isinstance(value, bool) or not isinstance(value, int):
             continue
+        endpoint_from = node.get("from")
+        endpoint_to = node.get("to")
         if (
             norm in DERIVED_DELTA_FIELDS
-            and _is_published_large_int(node.get("from"), min_cell)
-            and _is_published_large_int(node.get("to"), min_cell)
-            and node.get("to") - node.get("from") == value
+            and isinstance(endpoint_from, int)
+            and not isinstance(endpoint_from, bool)
+            and endpoint_from >= min_cell
+            and isinstance(endpoint_to, int)
+            and not isinstance(endpoint_to, bool)
+            and endpoint_to >= min_cell
+            and endpoint_to - endpoint_from == value
         ):
             # change == to - from with both endpoints public and large: the
             # delta is derived-public information whatever its magnitude.
