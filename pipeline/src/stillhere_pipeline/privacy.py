@@ -192,6 +192,26 @@ CELL_NUMERIC_ALLOWLIST: frozenset[str] = frozenset(
         "variablehours",
     }
 )
+#: DERIVED DELTAS (policy doc, "derived deltas of published aggregates"): a
+#: small `change` is exempt ONLY when its sibling `from` and `to` endpoints
+#: are both published integers at or above the threshold. The delta then
+#: carries no information the endpoints do not already publish (change is
+#: to minus from by construction), so flagging it protects nothing and
+#: suppressing it is defeated by subtraction. A small delta of SMALL
+#: endpoints stays caught through the endpoints themselves.
+DERIVED_DELTA_FIELDS: frozenset[str] = frozenset({"change"})
+
+#: ANONYMOUS-UNIT CATEGORY TALLIES (same policy-doc branch): counts of
+#: unnamed blocks by direction-of-change category. Exempt ONLY when at least
+#: two category tallies are present and they sum to a panel of at least the
+#: threshold: a category split of a large panel of anonymous geographic
+#: units names no person and no place. Unit-sum fields (for example
+#: decrease_units_on_blocks_with_decline) are NOT in this set and stay
+#: scanned: those count observation units, not blocks.
+ANONYMOUS_UNIT_CATEGORY_FIELDS: frozenset[str] = frozenset(
+    {"blockswithdecrease", "blockswithincrease", "blocksunchanged"}
+)
+
 # Deliberately NARROW. `area`, `areaid`, `neighborhood` and `observations`
 # are cell-context keys but are NOT exempt, because an integer under those
 # names is genuinely ambiguous: `{"observations": 3}` is as likely a count as
@@ -379,6 +399,10 @@ def is_suppressed(node: dict[str, Any]) -> bool:
     return False
 
 
+def _is_published_large_int(value: Any, min_cell: int) -> bool:
+    return isinstance(value, int) and not isinstance(value, bool) and value >= min_cell
+
+
 def _scan_counts(node: dict[str, Any], where: str, min_cell: int) -> Iterator[Finding]:
     """Flag published cell values small enough to identify a person (R-06)."""
     for key, value in node.items():
@@ -387,6 +411,25 @@ def _scan_counts(node: dict[str, Any], where: str, min_cell: int) -> Iterator[Fi
             continue
         if isinstance(value, bool) or not isinstance(value, int):
             continue
+        if (
+            norm in DERIVED_DELTA_FIELDS
+            and _is_published_large_int(node.get("from"), min_cell)
+            and _is_published_large_int(node.get("to"), min_cell)
+        ):
+            # change == to - from with both endpoints public and large: the
+            # delta is derived-public information whatever its magnitude.
+            continue
+        if norm in ANONYMOUS_UNIT_CATEGORY_FIELDS:
+            tallies = [
+                v
+                for k, v in node.items()
+                if normalize_key(k) in ANONYMOUS_UNIT_CATEGORY_FIELDS
+                and isinstance(v, int)
+                and not isinstance(v, bool)
+            ]
+            if len(tallies) >= 2 and sum(tallies) >= min_cell:
+                # A category split of a large panel of anonymous blocks.
+                continue
         if 0 < value < min_cell:
             yield Finding(
                 "BLOCK",

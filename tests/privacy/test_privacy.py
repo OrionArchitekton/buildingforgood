@@ -697,3 +697,53 @@ def test_genuine_ambiguity_still_passes() -> None:
         "by_type": {"individual": 38, "structure": None, "vehicle": None},
     }
     assert _blocking(scan_json_document(row, min_cell=5)) == []
+
+
+def test_derived_delta_with_large_published_endpoints_is_exempt() -> None:
+    node = {"area": "cortez", "active_blocks": {"change": 3, "from": 7, "to": 10}}
+    assert not [f for f in scan_json_document(node) if f.rule == "smallcell.unsuppressed_count"]
+
+
+def test_derived_delta_with_small_endpoints_is_still_caught() -> None:
+    # Small endpoints are themselves person-scale; the exemption must not fire.
+    node = {"area": "cortez", "active_blocks": {"change": 1, "from": 2, "to": 3}}
+    rules = [f.rule for f in scan_json_document(node)]
+    assert "smallcell.unsuppressed_count" in rules
+
+
+def test_derived_delta_without_endpoints_is_still_caught() -> None:
+    node = {"area": "cortez", "monthly": {"change": 3}}
+    rules = [f.rule for f in scan_json_document(node)]
+    assert "smallcell.unsuppressed_count" in rules
+
+
+def test_anonymous_category_tallies_of_a_large_panel_are_exempt() -> None:
+    node = {
+        "area": "core",
+        "gross_change": {
+            "blocks_with_increase": 19,
+            "blocks_with_decrease": 4,
+            "blocks_unchanged": 4,
+        },
+    }
+    assert not [f for f in scan_json_document(node) if f.rule == "smallcell.unsuppressed_count"]
+
+
+def test_anonymous_category_tallies_of_a_tiny_panel_are_caught() -> None:
+    node = {"area": "core", "gross_change": {"blocks_with_increase": 1, "blocks_with_decrease": 2}}
+    rules = [f.rule for f in scan_json_document(node)]
+    assert "smallcell.unsuppressed_count" in rules
+
+
+def test_unit_sum_fields_are_not_category_exempt() -> None:
+    node = {
+        "area": "core",
+        "gross_change": {
+            "blocks_with_increase": 19,
+            "blocks_with_decrease": 14,
+            "blocks_unchanged": 17,
+            "decrease_units_on_blocks_with_decline": 2,
+        },
+    }
+    rules = [f.rule for f in scan_json_document(node)]
+    assert "smallcell.unsuppressed_count" in rules

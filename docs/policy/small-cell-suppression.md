@@ -62,6 +62,28 @@ Suppression is disclosed, never silent: published rows list withheld types in
 `by_type_suppressed`, and the quality report carries a
 `small_cell_suppression` block (threshold, rows, cells, policy line).
 
+## Derived deltas and anonymous-unit category tallies (v1.1, PR #53)
+
+Two narrowly conditioned exemptions in the SCANNER (the emitter never needed
+them; they exist for analysis artifacts like demo.v1's balanced panel):
+
+- **Derived delta**: a small `change` whose sibling `from` and `to` are both
+  published integers at or above the threshold is exempt. `change` equals
+  `to - from` by construction, so it carries no information the endpoints do
+  not already publish; flagging it protects nothing and suppressing it is
+  defeated by subtraction. A small delta of SMALL endpoints stays caught
+  through the endpoints themselves.
+- **Anonymous-unit category tally**: `blocks_with_increase` /
+  `blocks_with_decrease` / `blocks_unchanged` are exempt only when at least
+  two tallies are present and sum to a panel of at least the threshold. A
+  category split of a large panel of unnamed geographic units names no
+  person and no place. Unit-sum fields (counts of observation units) are NOT
+  exempt and stay scanned.
+
+Both are conditional, never name-blanket: the condition is checked against
+the sibling values at scan time, per this policy's rule that exemptions stay
+narrow and self-evident.
+
 ## Known non-branches
 
 - No rollup totals (neighborhood, downtown, annual) are published; a guard
