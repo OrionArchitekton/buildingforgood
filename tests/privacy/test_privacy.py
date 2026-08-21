@@ -747,3 +747,12 @@ def test_unit_sum_fields_are_not_category_exempt() -> None:
     }
     rules = [f.rule for f in scan_json_document(node)]
     assert "smallcell.unsuppressed_count" in rules
+
+
+def test_inconsistent_delta_triple_is_not_exempt() -> None:
+    # {"change": 2, "from": 5, "to": 100}: change is NOT to - from, so the
+    # "derived delta" story is false and the small int stays caught. Without
+    # the arithmetic check an arbitrary small count could wear a delta's name.
+    node = {"area": "core", "monthly": {"change": 2, "from": 5, "to": 100}}
+    rules = [f.rule for f in scan_json_document(node)]
+    assert "smallcell.unsuppressed_count" in rules

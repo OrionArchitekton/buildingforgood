@@ -415,9 +415,13 @@ def _scan_counts(node: dict[str, Any], where: str, min_cell: int) -> Iterator[Fi
             norm in DERIVED_DELTA_FIELDS
             and _is_published_large_int(node.get("from"), min_cell)
             and _is_published_large_int(node.get("to"), min_cell)
+            and node.get("to") - node.get("from") == value
         ):
             # change == to - from with both endpoints public and large: the
             # delta is derived-public information whatever its magnitude.
+            # The arithmetic consistency check is load-bearing: without it an
+            # inconsistent triple smuggles an arbitrary small count past the
+            # gate wearing a delta's name.
             continue
         if norm in ANONYMOUS_UNIT_CATEGORY_FIELDS:
             tallies = [
